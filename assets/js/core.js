@@ -17,7 +17,6 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// STATE
 let currentUser = null;
 let userProfile = {};
 let px = new Array(1024).fill(null);
@@ -26,7 +25,6 @@ let color = '#3b82f6';
 let drawing = false; 
 let activeId = null;
 
-// DOM SETUP
 document.getElementById('givary-app').innerHTML = `
     <header class="app-header">
         <span class="brand-name">GIVARY - COMMUNITY</span>
@@ -38,7 +36,7 @@ document.getElementById('givary-app').innerHTML = `
 
     <div id="view-home" class="view active">
         <div class="art-grid" id="gallery-grid"></div>
-        <button class="btn-add" id="btn-new">+ BUAT KARYA</button>
+        <button class="btn-add" id="btn-new"><i class="fas fa-plus"></i> BUAT KARYA</button>
     </div>
 
     <div id="view-editor" class="view">
@@ -48,7 +46,7 @@ document.getElementById('givary-app').innerHTML = `
                     <i class="fas fa-arrow-left"></i> Kembali
                 </button>
                 <button id="btn-upload-img" style="background:var(--glass); border:none; color:white; padding:10px 15px; border-radius:12px; cursor:pointer;">
-                    <i class="fas fa-image"></i> Upload Foto
+                    <i class="fas fa-image"></i> Upload
                 </button>
                 <input type="file" id="file-upload" accept="image/*" style="display:none">
                 <button id="btn-save" style="background:var(--primary); border:none; color:white; padding:10px 25px; border-radius:12px; font-weight:bold; cursor:pointer;">
@@ -90,7 +88,7 @@ document.getElementById('givary-app').innerHTML = `
                 <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:20px;"></div>
                 
                 <div style="border-top:1px solid var(--glass-heavy); padding-top:20px;">
-                    <h3 style="margin:0 0 15px 0;">💬 Komentar</h3>
+                    <h3 style="margin:0 0 15px 0;"><i class="fas fa-comments"></i> Komentar</h3>
                     <div id="comment-list" style="margin-bottom:15px; max-height:300px; overflow-y:auto;"></div>
                     <div style="display:flex; gap:10px;">
                         <input id="inp-comment" placeholder="Tulis komentar..." style="flex:1; background:var(--glass); border:1px solid var(--glass-heavy); color:white; padding:12px; border-radius:12px;">
@@ -109,7 +107,6 @@ document.getElementById('givary-app').innerHTML = `
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 
-// HELPER: Show Toast
 function showToast(msg) {
     const toast = document.getElementById('toast');
     toast.innerText = msg;
@@ -117,7 +114,6 @@ function showToast(msg) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// HELPER: Render Canvas
 function render(c, d) { 
     if(!c) return; 
     c.clearRect(0,0,32,32); 
@@ -129,27 +125,23 @@ function render(c, d) {
     }); 
 }
 
-// HELPER: Switch View
 function switchView(view) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + view).classList.add('active');
 }
 window.backHome = () => switchView('home');
 
-// AUTH STATE LISTENER
 onAuthStateChanged(auth, u => {
     currentUser = u;
     if(u) {
-        // Load user profile from DB
         onValue(ref(db, 'users/' + u.uid), snap => {
             if(snap.exists()) {
                 userProfile = snap.val();
             } else {
-                // Create new profile
                 userProfile = {
                     name: u.displayName || 'User-' + u.uid.slice(0,5),
                     photo: u.photoURL || `https://ui-avatars.com/api/?name=${u.uid}`,
-                    bio: 'Anggota baru Givary 🎨'
+                    bio: 'Anggota baru Givary'
                 };
                 update(ref(db, 'users/' + u.uid), userProfile);
             }
@@ -164,18 +156,14 @@ onAuthStateChanged(auth, u => {
 function updateUI() {
     const name = currentUser ? (userProfile.name || 'User') : 'Login';
     const photo = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
-    
     document.getElementById('u-name').innerText = name;
     document.getElementById('u-avatar').src = photo;
 }
 
-// LOGIN/PROFILE HANDLERS
 document.getElementById('btn-login').onclick = () => {
     if(currentUser) {
-        // Show profile modal
         openProfileModal();
     } else {
-        // Show login modal
         openModal('modal-login');
     }
 };
@@ -184,9 +172,9 @@ document.getElementById('btn-google-login').onclick = () => {
     signInWithPopup(auth, provider)
         .then(() => {
             closeModal('modal-login');
-            showToast('✅ Login Berhasil!');
+            showToast('Login Berhasil');
         })
-        .catch(e => showToast('❌ Login Gagal: ' + e.message));
+        .catch(e => showToast('Login Gagal: ' + e.message));
 };
 
 document.getElementById('btn-close-login').onclick = () => closeModal('modal-login');
@@ -200,37 +188,33 @@ function openProfileModal() {
 
 document.getElementById('btn-save-profile').onclick = () => {
     if(!currentUser) return;
-    
     const newName = document.getElementById('inp-profile-name').value.trim();
     const newBio = document.getElementById('inp-profile-bio').value.trim();
-    
     if(!newName) {
-        showToast('⚠️ Nama tidak boleh kosong!');
+        showToast('Nama tidak boleh kosong');
         return;
     }
-    
     update(ref(db, 'users/' + currentUser.uid), {
         name: newName,
         bio: newBio,
-        photo: userProfile.photo // Keep existing photo
+        photo: userProfile.photo
     }).then(() => {
-        showToast('✅ Profil berhasil diupdate!');
+        showToast('Profil diupdate');
         closeModal('modal-profile');
     });
 };
 
 document.getElementById('btn-logout').onclick = () => {
-    if(confirm('Yakin ingin keluar?')) {
+    if(confirm('Keluar dari akun?')) {
         signOut(auth).then(() => {
             closeModal('modal-profile');
-            showToast('👋 Berhasil Logout!');
+            showToast('Logout Berhasil');
         });
     }
 };
 
 document.getElementById('btn-close-profile').onclick = () => closeModal('modal-profile');
 
-// MODAL HELPERS
 function openModal(id) {
     document.getElementById(id).classList.add('open');
 }
@@ -239,24 +223,18 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('open');
 }
 
-// GALLERY LOADER
 onValue(ref(db, 'artworks'), snap => {
     const grid = document.getElementById('gallery-grid'); 
     grid.innerHTML = '';
-    
     if(!snap.exists()) { 
-        grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; opacity:0.5; padding:50px;">Belum ada karya. Yuk jadi yang pertama! 🎨</p>'; 
+        grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; opacity:0.5; padding:50px;">Belum ada karya</p>'; 
         return; 
     }
-    
     const artworks = [];
     snap.forEach(child => {
         artworks.push({ id: child.key, ...child.val() });
     });
-    
-    // Sort by newest first
     artworks.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    
     artworks.forEach(data => {
         const photo = data.authorPhoto || `https://ui-avatars.com/api/?name=${data.authorName}`;
         const div = document.createElement('div'); 
@@ -273,11 +251,8 @@ onValue(ref(db, 'artworks'), snap => {
                 </div>
             </div>
         `;
-        
         div.onclick = () => openDetailView(data);
         grid.appendChild(div);
-        
-        // Render pixel art
         setTimeout(() => {
             const c = document.getElementById(`c-${data.id}`);
             if(c) render(c.getContext('2d'), JSON.parse(data.pixels));
@@ -288,16 +263,13 @@ onValue(ref(db, 'artworks'), snap => {
 function openDetailView(data) {
     activeId = data.id;
     document.getElementById('d-title').innerText = data.title || 'Untitled';
-    
     const photo = data.authorPhoto || `https://ui-avatars.com/api/?name=${data.authorName}`;
     document.getElementById('d-meta').innerHTML = `
         <img src="${photo}" style="width:24px; height:24px; border-radius:50%;">
         <span>Oleh <b>${data.authorName || 'Anonim'}</b></span>
     `;
-    
     const detailCanvas = document.getElementById('detail-canvas');
     render(detailCanvas.getContext('2d'), JSON.parse(data.pixels));
-    
     switchView('detail');
     loadComments(data.id);
 }
@@ -307,7 +279,7 @@ function loadComments(id) {
     onValue(ref(db, 'comments/' + id), s => {
         list.innerHTML = '';
         if(!s.exists()) { 
-            list.innerHTML = '<p style="opacity:0.3; font-size:0.85rem; padding:10px;">Belum ada komentar. Yuk jadi yang pertama!</p>'; 
+            list.innerHTML = '<p style="opacity:0.3; font-size:0.85rem; padding:10px;">Belum ada komentar</p>'; 
             return; 
         }
         s.forEach(c => {
@@ -324,24 +296,21 @@ function loadComments(id) {
 document.getElementById('btn-send').onclick = () => {
     const text = document.getElementById('inp-comment').value.trim();
     if(!text) return;
-    
     if(!currentUser) {
-        showToast('⚠️ Login dulu untuk komentar!');
+        showToast('Login diperlukan');
         openModal('modal-login');
         return;
     }
-    
     push(ref(db, 'comments/' + activeId), { 
         text, 
         authorName: userProfile.name || 'Anonim',
         timestamp: Date.now()
     }).then(() => {
         document.getElementById('inp-comment').value = '';
-        showToast('✅ Komentar terkirim!');
+        showToast('Terkirim');
     });
 };
 
-// DRAWING TOOLS
 const draw = (e) => {
     if(!drawing) return;
     const r = canvas.getBoundingClientRect();
@@ -349,7 +318,6 @@ const draw = (e) => {
     const cy = e.touches ? e.touches[0].clientY : e.clientY;
     const x = Math.floor((cx-r.left)*(32/r.width));
     const y = Math.floor((cy-r.top)*(32/r.height));
-    
     if(x>=0 && x<32 && y>=0 && y<32) {
         const idx = y*32+x;
         if(tool === 'pencil') {
@@ -368,23 +336,17 @@ function floodFill(x, y, newColor) {
     const idx = y*32+x;
     const targetColor = px[idx];
     if(targetColor === newColor) return;
-    
     const stack = [idx];
     const visited = new Set();
-    
     while(stack.length) {
         const i = stack.pop();
         if(visited.has(i)) continue;
-        
         const cx = i % 32;
         const cy = Math.floor(i / 32);
-        
         if(cx < 0 || cx >= 32 || cy < 0 || cy >= 32) continue;
         if(px[i] !== targetColor) continue;
-        
         px[i] = newColor;
         visited.add(i);
-        
         stack.push(i-1, i+1, i-32, i+32);
     }
 }
@@ -423,7 +385,6 @@ function updateToolButtons() {
     document.getElementById('t-bucket').style.background = tool === 'bucket' ? 'var(--primary)' : 'var(--glass-heavy)';
 }
 
-// PHOTO UPLOAD → PIXELATE
 document.getElementById('btn-upload-img').onclick = () => {
     document.getElementById('file-upload').click();
 };
@@ -431,37 +392,30 @@ document.getElementById('btn-upload-img').onclick = () => {
 document.getElementById('file-upload').onchange = (e) => {
     const file = e.target.files[0];
     if(!file) return;
-    
     const reader = new FileReader();
     reader.onload = (evt) => {
         const img = new Image();
         img.onload = () => {
-            // Draw to temp canvas and downscale to 32x32
             const temp = document.createElement('canvas');
             temp.width = 32;
             temp.height = 32;
             const tempCtx = temp.getContext('2d');
             tempCtx.drawImage(img, 0, 0, 32, 32);
-            
             const imageData = tempCtx.getImageData(0, 0, 32, 32);
             const data = imageData.data;
-            
-            // Convert to pixel array
             for(let i = 0; i < 1024; i++) {
                 const r = data[i*4];
                 const g = data[i*4+1];
                 const b = data[i*4+2];
                 const a = data[i*4+3];
-                
                 if(a > 128) {
                     px[i] = `#${((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1)}`;
                 } else {
                     px[i] = null;
                 }
             }
-            
             render(ctx, px);
-            showToast('✅ Foto berhasil dikonversi!');
+            showToast('Konversi Berhasil');
             e.target.value = '';
         };
         img.src = evt.target.result;
@@ -469,7 +423,6 @@ document.getElementById('file-upload').onchange = (e) => {
     reader.readAsDataURL(file);
 };
 
-// EDITOR ACTIONS
 document.getElementById('btn-new').onclick = () => {
     px.fill(null);
     render(ctx, px);
@@ -478,7 +431,7 @@ document.getElementById('btn-new').onclick = () => {
 
 document.getElementById('btn-save').onclick = () => {
     if(!currentUser) {
-        showToast('⚠️ Login dulu untuk publish!');
+        showToast('Login diperlukan');
         openModal('modal-login');
         return;
     }
@@ -488,12 +441,10 @@ document.getElementById('btn-save').onclick = () => {
 document.getElementById('btn-publish').onclick = () => {
     const title = document.getElementById('inp-title').value.trim();
     const desc = document.getElementById('inp-desc').value.trim();
-    
     if(!title) {
-        showToast('⚠️ Judul tidak boleh kosong!');
+        showToast('Judul diperlukan');
         return;
     }
-    
     push(ref(db, 'artworks'), {
         title,
         description: desc,
@@ -503,7 +454,7 @@ document.getElementById('btn-publish').onclick = () => {
         authorUid: currentUser.uid,
         timestamp: Date.now()
     }).then(() => {
-        showToast('🎉 Karya berhasil dipublikasikan!');
+        showToast('Berhasil Publish');
         closeModal('modal-publish');
         document.getElementById('inp-title').value = '';
         document.getElementById('inp-desc').value = '';
