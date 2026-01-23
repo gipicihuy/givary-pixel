@@ -27,6 +27,7 @@ let color = '#3b82f6';
 let drawing = false; 
 let activeId = null;
 
+// --- UI LAYOUT ---
 document.getElementById('givary-app').innerHTML = `
     <header class="app-header">
         <span class="brand-name">GIVARY - COMMUNITY</span>
@@ -55,11 +56,9 @@ document.getElementById('givary-app').innerHTML = `
                     <i class="fas fa-paper-plane"></i> Publish
                 </button>
             </div>
-            
             <div style="width:340px; height:340px; background:repeating-conic-gradient(#ddd 0% 25%, white 0% 50%) 50% / 20px 20px; border-radius:24px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
                 <canvas id="main-canvas" width="32" height="32" style="width:100%;height:100%;image-rendering:pixelated"></canvas>
             </div>
-            
             <div class="editor-tools">
                 <input type="color" id="color-picker" value="#3b82f6" style="width:42px;height:42px;border:none;background:none;cursor:pointer;">
                 <button id="t-pencil" class="tool-btn active"><i class="fas fa-pencil-alt"></i></button>
@@ -81,7 +80,6 @@ document.getElementById('givary-app').innerHTML = `
                 <div class="canvas-container" style="border-radius:20px; margin-bottom:20px;">
                     <canvas id="detail-canvas" width="32" height="32"></canvas>
                 </div>
-                
                 <h2 id="d-title" style="margin:20px 0 5px"></h2>
                 <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:20px;"></div>
                 
@@ -109,37 +107,13 @@ document.getElementById('givary-app').innerHTML = `
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 
-// --- HISTORY LOGIC ---
-function saveHistory() {
-    history.push([...px]);
-    if (history.length > 30) history.shift();
-    redoStack = [];
-}
-
-function undo() {
-    if (history.length > 0) {
-        redoStack.push([...px]);
-        px = history.pop();
-        render(ctx, px);
-    }
-}
-
-function redo() {
-    if (redoStack.length > 0) {
-        history.push([...px]);
-        px = redoStack.pop();
-        render(ctx, px);
-    }
-}
-
-// --- RENDERING ---
+// --- CORE UTILITIES ---
 function render(c, d) { 
     if(!c) return; 
     c.clearRect(0,0,32,32); 
     d.forEach((p, i) => { if(p) { c.fillStyle = p; c.fillRect(i%32, Math.floor(i/32), 1, 1); } }); 
 }
 
-// --- SYSTEM ---
 function showToast(msg) {
     const toast = document.getElementById('toast');
     toast.innerText = msg;
@@ -153,7 +127,10 @@ function switchView(view) {
 }
 window.backHome = () => switchView('home');
 
-// --- AUTH & USER PROFILE ---
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// --- AUTHENTICATION ---
 onAuthStateChanged(auth, u => {
     currentUser = u;
     if(u) {
@@ -173,7 +150,7 @@ function updateUI() {
     document.getElementById('u-avatar').src = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
 }
 
-document.getElementById('btn-login').onclick = () => { if(currentUser) { openProfileModal(); } else { openModal('modal-login'); } };
+document.getElementById('btn-login').onclick = () => { currentUser ? openProfileModal() : openModal('modal-login'); };
 document.getElementById('btn-google-login').onclick = () => {
     signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Login Berhasil'); }).catch(() => showToast('Login Gagal'));
 };
@@ -187,7 +164,7 @@ function openProfileModal() {
 
 document.getElementById('btn-save-profile').onclick = () => {
     const newName = document.getElementById('inp-profile-name').value.trim();
-    if(!newName) return showToast('Nama tidak boleh kosong');
+    if(!newName) return showToast('Nama wajib diisi');
     update(ref(db, 'users/' + currentUser.uid), { 
         name: newName, 
         bio: document.getElementById('inp-profile-bio').value.trim(), 
@@ -195,9 +172,9 @@ document.getElementById('btn-save-profile').onclick = () => {
     }).then(() => { showToast('Profil diupdate'); closeModal('modal-profile'); });
 };
 
-document.getElementById('btn-logout').onclick = () => { if(confirm('Logout dari akun?')) signOut(auth).then(() => closeModal('modal-profile')); };
+document.getElementById('btn-logout').onclick = () => { if(confirm('Logout?')) signOut(auth).then(() => closeModal('modal-profile')); };
 
-// --- GALLERY & DYNAMIC NAMES ---
+// --- GALLERY LOGIC ---
 onValue(ref(db, 'artworks'), snap => {
     const grid = document.getElementById('gallery-grid'); 
     grid.innerHTML = '';
@@ -212,7 +189,6 @@ onValue(ref(db, 'artworks'), snap => {
         div.className = 'art-card';
         const nameId = `n-${data.id}`;
         const picId = `p-${data.id}`;
-
         div.innerHTML = `
             <div class="canvas-container"><canvas id="c-${data.id}" width="32" height="32"></canvas></div>
             <div class="art-overlay">
@@ -222,23 +198,16 @@ onValue(ref(db, 'artworks'), snap => {
                     <span id="${nameId}">Loading...</span>
                 </div>
             </div>`;
-        
         div.onclick = () => openDetailView(data);
         grid.appendChild(div);
 
-        // Update nama/foto secara real-time berdasarkan authorUid
         onValue(ref(db, 'users/' + data.authorUid), uSnap => {
             const u = uSnap.val();
-            const elN = document.getElementById(nameId);
-            const elP = document.getElementById(picId);
-            if(u && elN && elP) {
-                elN.innerText = u.name;
-                elP.src = u.photo;
-                data.authorName = u.name;
-                data.authorPhoto = u.photo;
+            if(u && document.getElementById(nameId)) {
+                document.getElementById(nameId).innerText = u.name;
+                document.getElementById(picId).src = u.photo;
             }
         });
-
         setTimeout(() => { const c = document.getElementById(`c-${data.id}`); if(c) render(c.getContext('2d'), JSON.parse(data.pixels)); }, 10);
     });
 });
@@ -253,7 +222,6 @@ function openDetailView(data) {
             document.getElementById('d-meta').innerHTML = `<img src="${u.photo}" style="width:24px; height:24px; border-radius:50%;"><span>Oleh <b>${u.name}</b></span>`;
         }
     }, { onlyOnce: true });
-
     render(document.getElementById('detail-canvas').getContext('2d'), JSON.parse(data.pixels));
     switchView('detail');
     loadComments(data.id);
@@ -271,13 +239,23 @@ function loadComments(id) {
     });
 }
 
+// PROTEKSI KOMENTAR: Cek login sebelum kirim
 document.getElementById('btn-send').onclick = () => {
+    if(!currentUser) {
+        showToast('Login diperlukan untuk berkomentar!');
+        openModal('modal-login');
+        return;
+    }
     const text = document.getElementById('inp-comment').value.trim();
-    if(!text || !currentUser) return;
-    push(ref(db, 'comments/' + activeId), { text, authorName: userProfile.name, timestamp: Date.now() }).then(() => { document.getElementById('inp-comment').value = ''; });
+    if(!text) return;
+    push(ref(db, 'comments/' + activeId), { 
+        text, 
+        authorName: userProfile.name, 
+        timestamp: Date.now() 
+    }).then(() => { document.getElementById('inp-comment').value = ''; });
 };
 
-// --- DRAWING TOOLS ---
+// --- DRAWING LOGIC ---
 const draw = (e) => {
     if(!drawing) return;
     const r = canvas.getBoundingClientRect();
@@ -301,12 +279,16 @@ function floodFill(x, y, newColor) {
     const stack = [idx];
     while(stack.length) {
         const i = stack.pop();
-        const cx = i % 32; const cy = Math.floor(i / 32);
+        const cx = i % 32, cy = Math.floor(i / 32);
         if(cx < 0 || cx >= 32 || cy < 0 || cy >= 32 || px[i] !== targetColor) continue;
         px[i] = newColor;
         stack.push(i-1, i+1, i-32, i+32);
     }
 }
+
+function saveHistory() { history.push([...px]); if(history.length > 30) history.shift(); redoStack = []; }
+document.getElementById('t-undo').onclick = () => { if(history.length > 0) { redoStack.push([...px]); px = history.pop(); render(ctx, px); } };
+document.getElementById('t-redo').onclick = () => { if(redoStack.length > 0) { history.push([...px]); px = redoStack.pop(); render(ctx, px); } };
 
 canvas.onmousedown = (e) => { saveHistory(); drawing=true; draw(e); }
 window.onmouseup = () => drawing = false;
@@ -315,8 +297,6 @@ canvas.ontouchstart = (e) => { e.preventDefault(); saveHistory(); drawing=true; 
 canvas.ontouchmove = (e) => { e.preventDefault(); draw(e); }
 canvas.ontouchend = () => drawing = false;
 
-document.getElementById('t-undo').onclick = undo;
-document.getElementById('t-redo').onclick = redo;
 document.getElementById('color-picker').oninput = (e) => { color = e.target.value; tool = 'pencil'; updateToolButtons(); };
 document.getElementById('t-pencil').onclick = () => { tool = 'pencil'; updateToolButtons(); };
 document.getElementById('t-eraser').onclick = () => { tool = 'eraser'; updateToolButtons(); };
@@ -327,6 +307,7 @@ function updateToolButtons() {
     document.getElementById('t-' + tool).classList.add('active');
 }
 
+// --- FILE & PUBLISH ---
 document.getElementById('btn-upload-img').onclick = () => document.getElementById('file-upload').click();
 document.getElementById('file-upload').onchange = (e) => {
     const file = e.target.files[0];
@@ -336,34 +317,28 @@ document.getElementById('file-upload').onchange = (e) => {
         const img = new Image();
         img.onload = () => {
             saveHistory();
-            const tempCtx = document.createElement('canvas').getContext('2d');
-            tempCtx.canvas.width = 32; tempCtx.canvas.height = 32;
-            tempCtx.drawImage(img, 0, 0, 32, 32);
-            const data = tempCtx.getImageData(0, 0, 32, 32).data;
+            const tC = document.createElement('canvas').getContext('2d');
+            tC.canvas.width = 32; tC.canvas.height = 32;
+            tC.drawImage(img, 0, 0, 32, 32);
+            const data = tC.getImageData(0, 0, 32, 32).data;
             for(let i = 0; i < 1024; i++) {
                 const r = data[i*4], g = data[i*4+1], b = data[i*4+2], a = data[i*4+3];
                 px[i] = a > 128 ? `#${((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1)}` : null;
             }
             render(ctx, px);
-            showToast('Konversi Berhasil');
+            showToast('Gambar Berhasil Dikonversi');
         };
         img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
 };
 
-// --- MODALS ---
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.getElementById('btn-close-login').onclick = () => closeModal('modal-login');
-document.getElementById('btn-close-profile').onclick = () => closeModal('modal-profile');
-
 document.getElementById('btn-new').onclick = () => { px.fill(null); history = []; redoStack = []; render(ctx, px); switchView('editor'); };
 document.getElementById('btn-save').onclick = () => { if(!currentUser) { showToast('Login diperlukan'); openModal('modal-login'); return; } openModal('modal-publish'); };
 
 document.getElementById('btn-publish').onclick = () => {
     const title = document.getElementById('inp-title').value.trim();
-    if(!title) return showToast('Judul diperlukan');
+    if(!title) return showToast('Judul tidak boleh kosong');
     push(ref(db, 'artworks'), {
         title, 
         description: document.getElementById('inp-desc').value.trim(),
@@ -371,9 +346,12 @@ document.getElementById('btn-publish').onclick = () => {
         authorUid: currentUser.uid, 
         timestamp: Date.now()
     }).then(() => { 
-        showToast('Berhasil Publish'); 
+        showToast('Berhasil Publish!'); 
         closeModal('modal-publish'); 
         switchView('home'); 
     });
 };
+
 document.getElementById('btn-cancel-publish').onclick = () => closeModal('modal-publish');
+document.getElementById('btn-close-login').onclick = () => closeModal('modal-login');
+document.getElementById('btn-close-profile').onclick = () => closeModal('modal-profile');
