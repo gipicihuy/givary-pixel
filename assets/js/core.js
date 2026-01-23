@@ -129,6 +129,8 @@ function showToast(msg) {
 function switchView(view) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + view).classList.add('active');
+    // FIX: Pastikan scroll balik ke atas biar header gak hilang/ketutup
+    window.scrollTo(0, 0);
 }
 window.backHome = () => switchView('home');
 
@@ -271,7 +273,6 @@ function loadComments(id) {
             const cDiv = document.createElement('div');
             cDiv.style = "display:flex; gap:12px; background:var(--glass); padding:12px; border-radius:15px; align-items:flex-start;";
             
-            // Format waktu: Tanggal Bulan Tahun, Jam:Menit
             const date = new Date(v.timestamp);
             const timeStr = new Intl.DateTimeFormat('id-ID', {
                 day: 'numeric', month: 'short', year: 'numeric',
