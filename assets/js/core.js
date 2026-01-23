@@ -132,7 +132,7 @@ function switchView(view) {
 }
 window.backHome = () => switchView('home');
 
-// --- AUTH & PROFILE ---
+// --- AUTH & PROFILE LOGIC ---
 onAuthStateChanged(auth, u => {
     currentUser = u;
     if(u) {
@@ -144,7 +144,10 @@ onAuthStateChanged(auth, u => {
             }
             updateUI();
         });
-    } else { userProfile = {}; updateUI(); }
+    } else { 
+        userProfile = {}; 
+        updateUI(); 
+    }
 });
 
 function updateUI() {
@@ -152,42 +155,49 @@ function updateUI() {
     document.getElementById('u-avatar').src = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
 }
 
-// FIX: MODAL PROFIL & SAVE FEATURE
+// --- MODAL PROFILE FUNCTIONS ---
 window.openProfileModal = () => {
     const modal = document.getElementById('modal-profile');
     if(modal) {
-        document.getElementById('profile-avatar').src = userProfile.photo;
-        document.getElementById('inp-profile-name').value = userProfile.name;
-        document.getElementById('inp-profile-bio').value = userProfile.bio;
+        document.getElementById('profile-avatar').src = userProfile.photo || 'https://ui-avatars.com/api/?name=Guest';
+        document.getElementById('inp-profile-name').value = userProfile.name || '';
+        document.getElementById('inp-profile-bio').value = userProfile.bio || '';
         modal.classList.add('open');
     }
 };
 
-// Fungsi Baru: Simpan Perubahan Profil ke Firebase
+// FIX: SAVE PROFILE
 window.saveProfile = () => {
     if(!currentUser) return;
-    const newName = document.getElementById('inp-profile-name').value.trim();
-    const newBio = document.getElementById('inp-profile-bio').value.trim();
-    
-    if(!newName) return showToast("Nama gak boleh kosong!");
+    const name = document.getElementById('inp-profile-name').value.trim();
+    const bio = document.getElementById('inp-profile-bio').value.trim();
+    if(!name) return showToast("Nama gak boleh kosong!");
 
-    update(ref(db, 'users/' + currentUser.uid), {
-        name: newName,
-        bio: newBio
-    }).then(() => {
-        showToast("Profil Berhasil Diupdate!");
-        closeModal('modal-profile');
-    }).catch(() => showToast("Gagal update profil"));
+    update(ref(db, 'users/' + currentUser.uid), { name, bio })
+        .then(() => { showToast("Profil Disimpan!"); closeModal('modal-profile'); })
+        .catch(() => showToast("Gagal update profil"));
 };
 
-// Sambungin ke tombol save di modal (pastikan ID-nya btn-save-profile di HTML)
-const btnSaveProf = document.getElementById('btn-save-profile');
-if(btnSaveProf) btnSaveProf.onclick = window.saveProfile;
+// FIX: LOGOUT FUNCTION
+window.logout = () => {
+    signOut(auth).then(() => {
+        closeModal('modal-profile');
+        showToast("Berhasil Keluar");
+    }).catch(() => showToast("Gagal Logout"));
+};
 
+// Event Listener untuk Tombol Login/Profil di Header
 document.getElementById('btn-login').onclick = () => { 
     if(currentUser) { window.openProfileModal(); } 
     else { openModal('modal-login'); } 
 };
+
+// Pastikan tombol di dalam modal punya ID yang benar (Sesuaikan dengan HTML lo)
+const btnSaveProf = document.getElementById('btn-save-profile');
+if(btnSaveProf) btnSaveProf.onclick = window.saveProfile;
+
+const btnLogout = document.getElementById('btn-logout');
+if(btnLogout) btnLogout.onclick = window.logout;
 
 // --- GALLERY ---
 onValue(ref(db, 'artworks'), snap => {
@@ -379,9 +389,15 @@ document.getElementById('file-upload').onchange = (e) => {
     reader.readAsDataURL(file);
 };
 
-// --- MODALS ---
-window.openModal = (id) => { document.getElementById(id).classList.add('open'); };
-window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
+// --- MODALS CORE ---
+window.openModal = (id) => { 
+    const m = document.getElementById(id);
+    if(m) m.classList.add('open'); 
+};
+window.closeModal = (id) => { 
+    const m = document.getElementById(id);
+    if(m) m.classList.remove('open'); 
+};
 
 document.getElementById('btn-new').onclick = () => { px.fill(null); history = []; redoStack = []; render(ctx, px); switchView('editor'); };
 document.getElementById('btn-save').onclick = () => { if(!currentUser) { showToast('Login dulu!'); openModal('modal-login'); return; } openModal('modal-publish'); };
