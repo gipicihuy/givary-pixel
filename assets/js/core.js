@@ -166,7 +166,6 @@ window.openProfileModal = () => {
     }
 };
 
-// FIX: SAVE PROFILE
 window.saveProfile = () => {
     if(!currentUser) return;
     const name = document.getElementById('inp-profile-name').value.trim();
@@ -178,7 +177,6 @@ window.saveProfile = () => {
         .catch(() => showToast("Gagal update profil"));
 };
 
-// FIX: LOGOUT FUNCTION
 window.logout = () => {
     signOut(auth).then(() => {
         closeModal('modal-profile');
@@ -186,13 +184,11 @@ window.logout = () => {
     }).catch(() => showToast("Gagal Logout"));
 };
 
-// Event Listener untuk Tombol Login/Profil di Header
 document.getElementById('btn-login').onclick = () => { 
     if(currentUser) { window.openProfileModal(); } 
     else { openModal('modal-login'); } 
 };
 
-// Pastikan tombol di dalam modal punya ID yang benar (Sesuaikan dengan HTML lo)
 const btnSaveProf = document.getElementById('btn-save-profile');
 if(btnSaveProf) btnSaveProf.onclick = window.saveProfile;
 
@@ -275,12 +271,22 @@ function loadComments(id) {
             const cDiv = document.createElement('div');
             cDiv.style = "display:flex; gap:12px; background:var(--glass); padding:12px; border-radius:15px; align-items:flex-start;";
             
+            // Format waktu: Tanggal Bulan Tahun, Jam:Menit
+            const date = new Date(v.timestamp);
+            const timeStr = new Intl.DateTimeFormat('id-ID', {
+                day: 'numeric', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            }).format(date);
+
             onValue(ref(db, 'users/' + v.authorUid), uSnap => {
                 const u = uSnap.val() || { photo: 'https://ui-avatars.com/api/?name=?', name: v.authorName };
                 cDiv.innerHTML = `
                     <img src="${u.photo}" style="width:32px; height:32px; border-radius:50%;">
                     <div style="flex:1">
-                        <b style="font-size:0.8rem; color:var(--primary);">${u.name}</b>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <b style="font-size:0.8rem; color:var(--primary);">${u.name}</b>
+                            <span style="font-size:0.65rem; color:var(--text-dim);">${timeStr}</span>
+                        </div>
                         <p style="font-size:0.85rem; margin:3px 0 0 0; color:white;">${v.text}</p>
                     </div>
                 `;
