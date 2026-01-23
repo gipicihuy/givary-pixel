@@ -152,7 +152,7 @@ function updateUI() {
     document.getElementById('u-avatar').src = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
 }
 
-// FIX: Panggil Modal Profil (Fungsi Global)
+// FIX: MODAL PROFIL & SAVE FEATURE
 window.openProfileModal = () => {
     const modal = document.getElementById('modal-profile');
     if(modal) {
@@ -162,6 +162,27 @@ window.openProfileModal = () => {
         modal.classList.add('open');
     }
 };
+
+// Fungsi Baru: Simpan Perubahan Profil ke Firebase
+window.saveProfile = () => {
+    if(!currentUser) return;
+    const newName = document.getElementById('inp-profile-name').value.trim();
+    const newBio = document.getElementById('inp-profile-bio').value.trim();
+    
+    if(!newName) return showToast("Nama gak boleh kosong!");
+
+    update(ref(db, 'users/' + currentUser.uid), {
+        name: newName,
+        bio: newBio
+    }).then(() => {
+        showToast("Profil Berhasil Diupdate!");
+        closeModal('modal-profile');
+    }).catch(() => showToast("Gagal update profil"));
+};
+
+// Sambungin ke tombol save di modal (pastikan ID-nya btn-save-profile di HTML)
+const btnSaveProf = document.getElementById('btn-save-profile');
+if(btnSaveProf) btnSaveProf.onclick = window.saveProfile;
 
 document.getElementById('btn-login').onclick = () => { 
     if(currentUser) { window.openProfileModal(); } 
@@ -234,7 +255,6 @@ function openDetailView(data) {
     loadComments(data.id);
 }
 
-// FIX: Komentar dengan Foto Profil Real-time
 function loadComments(id) {
     const list = document.getElementById('comment-list');
     onValue(ref(db, 'comments/' + id), s => {
@@ -245,7 +265,6 @@ function loadComments(id) {
             const cDiv = document.createElement('div');
             cDiv.style = "display:flex; gap:12px; background:var(--glass); padding:12px; border-radius:15px; align-items:flex-start;";
             
-            // Nested listener untuk ambil foto user tiap komentar
             onValue(ref(db, 'users/' + v.authorUid), uSnap => {
                 const u = uSnap.val() || { photo: 'https://ui-avatars.com/api/?name=?', name: v.authorName };
                 cDiv.innerHTML = `
@@ -324,7 +343,7 @@ function updateToolButtons() { document.querySelectorAll('.tool-btn').forEach(b 
 document.getElementById('btn-download').onclick = () => {
     const tempCanvas = document.createElement('canvas');
     const tCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = 1024; tC.height = 1024;
+    tempCanvas.width = 1024; tempCanvas.height = 1024;
     tCtx.imageSmoothingEnabled = false;
     JSON.parse(currentActivePixels).forEach((p, i) => {
         if(p) { tCtx.fillStyle = p; tCtx.fillRect((i%32)*32, Math.floor(i/32)*32, 32, 32); }
