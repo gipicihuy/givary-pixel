@@ -9,6 +9,58 @@
 </head>
 <body>
     <div id="givary-app"></div>
+    
+    <!-- MODALS (Bootstrap-style) -->
+    <div id="modal-publish" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-handle"></div>
+            <h2 style="margin-top:0;">📝 Publikasikan Karya</h2>
+            <div class="form-group">
+                <label>Judul</label>
+                <input type="text" id="inp-title" placeholder="Beri judul karyamu..." class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Deskripsi (Opsional)</label>
+                <textarea id="inp-desc" placeholder="Ceritakan tentang karyamu..." class="form-textarea"></textarea>
+            </div>
+            <button id="btn-publish" class="btn-primary">🚀 Publikasikan</button>
+            <button id="btn-cancel-publish" class="btn-secondary">Batal</button>
+        </div>
+    </div>
+
+    <div id="modal-profile" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-handle"></div>
+            <h2 style="margin-top:0;">👤 Profil Saya</h2>
+            <div style="text-align:center; margin-bottom:20px;">
+                <img id="profile-avatar" src="" style="width:80px; height:80px; border-radius:50%; border:3px solid var(--primary);">
+            </div>
+            <div class="form-group">
+                <label>Nama</label>
+                <input type="text" id="inp-profile-name" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Bio</label>
+                <textarea id="inp-profile-bio" placeholder="Ceritakan tentang dirimu..." class="form-textarea"></textarea>
+            </div>
+            <button id="btn-save-profile" class="btn-primary">💾 Simpan Profil</button>
+            <button id="btn-logout" class="btn-danger">🚪 Sign Out</button>
+            <button id="btn-close-profile" class="btn-secondary">Tutup</button>
+        </div>
+    </div>
+
+    <div id="modal-login" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-handle"></div>
+            <h2 style="margin-top:0;">🔐 Login Diperlukan</h2>
+            <p style="color:var(--text-dim); margin-bottom:20px;">Login untuk membuat karya, komentar, dan berinteraksi dengan komunitas.</p>
+            <button id="btn-google-login" class="btn-google">
+                <i class="fab fa-google"></i> Login dengan Google
+            </button>
+            <button id="btn-close-login" class="btn-secondary">Nanti Saja</button>
+        </div>
+    </div>
+
     <script type="module" src="assets/js/core.js"></script>
     <script>
         document.addEventListener('contextmenu', e => e.preventDefault());
