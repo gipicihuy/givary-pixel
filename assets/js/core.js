@@ -20,6 +20,8 @@ const provider = new GoogleAuthProvider();
 let currentUser = null;
 let userProfile = {};
 let px = new Array(1024).fill(null);
+let history = [];
+let redoStack = [];
 let tool = 'pencil'; 
 let color = '#3b82f6'; 
 let drawing = false; 
@@ -46,7 +48,7 @@ document.getElementById('givary-app').innerHTML = `
                     <i class="fas fa-arrow-left"></i> Kembali
                 </button>
                 <button id="btn-upload-img" style="background:var(--glass); border:none; color:white; padding:10px 15px; border-radius:12px; cursor:pointer;">
-                    <i class="fas fa-image"></i> Upload
+                    <i class="fas fa-image"></i>
                 </button>
                 <input type="file" id="file-upload" accept="image/*" style="display:none">
                 <button id="btn-save" style="background:var(--primary); border:none; color:white; padding:10px 25px; border-radius:12px; font-weight:bold; cursor:pointer;">
@@ -58,17 +60,14 @@ document.getElementById('givary-app').innerHTML = `
                 <canvas id="main-canvas" width="32" height="32" style="width:100%;height:100%;image-rendering:pixelated"></canvas>
             </div>
             
-            <div style="margin-top:25px; display:flex; gap:12px; background:var(--glass); padding:15px; border-radius:20px; border:1px solid var(--glass-heavy);">
-                <input type="color" id="color-picker" value="#3b82f6" style="width:45px;height:45px;border:none;background:none;cursor:pointer;border-radius:10px;">
-                <button id="t-pencil" style="background:var(--primary); border:none; color:white; width:45px; height:45px; border-radius:10px; cursor:pointer;">
-                    <i class="fas fa-pencil-alt"></i>
-                </button>
-                <button id="t-eraser" style="background:var(--glass-heavy); border:none; color:white; width:45px; height:45px; border-radius:10px; cursor:pointer;">
-                    <i class="fas fa-eraser"></i>
-                </button>
-                <button id="t-bucket" style="background:var(--glass-heavy); border:none; color:white; width:45px; height:45px; border-radius:10px; cursor:pointer;">
-                    <i class="fas fa-fill-drip"></i>
-                </button>
+            <div class="editor-tools">
+                <input type="color" id="color-picker" value="#3b82f6" style="width:42px;height:42px;border:none;background:none;cursor:pointer;">
+                <button id="t-pencil" class="tool-btn active"><i class="fas fa-pencil-alt"></i></button>
+                <button id="t-eraser" class="tool-btn"><i class="fas fa-eraser"></i></button>
+                <button id="t-bucket" class="tool-btn"><i class="fas fa-fill-drip"></i></button>
+                <div style="width:1px; background:var(--glass-heavy); margin:0 5px;"></div>
+                <button id="t-undo" class="tool-btn"><i class="fas fa-undo"></i></button>
+                <button id="t-redo" class="tool-btn"><i class="fas fa-redo"></i></button>
             </div>
         </div>
     </div>
@@ -78,34 +77,51 @@ document.getElementById('givary-app').innerHTML = `
             <button onclick="backHome()" style="background:var(--glass); border:none; color:white; padding:10px 15px; border-radius:12px; margin-bottom:20px; cursor:pointer;">
                 <i class="fas fa-arrow-left"></i> Kembali
             </button>
-            
             <div style="width:100%; max-width:400px; margin:0 auto;">
                 <div class="canvas-container" style="border-radius:20px; margin-bottom:20px;">
                     <canvas id="detail-canvas" width="32" height="32"></canvas>
                 </div>
-                
                 <h2 id="d-title" style="margin:20px 0 10px"></h2>
-                <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:20px;"></div>
-                
+                <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:10px;"></div>
+                <p id="d-desc" style="color:var(--text-dim); font-size:0.9rem; line-height:1.5; margin-bottom:20px;"></p>
                 <div style="border-top:1px solid var(--glass-heavy); padding-top:20px;">
                     <h3 style="margin:0 0 15px 0;"><i class="fas fa-comments"></i> Komentar</h3>
                     <div id="comment-list" style="margin-bottom:15px; max-height:300px; overflow-y:auto;"></div>
                     <div style="display:flex; gap:10px;">
                         <input id="inp-comment" placeholder="Tulis komentar..." style="flex:1; background:var(--glass); border:1px solid var(--glass-heavy); color:white; padding:12px; border-radius:12px;">
-                        <button id="btn-send" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:12px; cursor:pointer;">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                        <button id="btn-send" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:12px; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
     <div class="toast" id="toast">Notifikasi</div>
 `;
 
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
+
+function saveHistory() {
+    history.push([...px]);
+    if (history.length > 30) history.shift();
+    redoStack = [];
+}
+
+function undo() {
+    if (history.length > 0) {
+        redoStack.push([...px]);
+        px = history.pop();
+        render(ctx, px);
+    }
+}
+
+function redo() {
+    if (redoStack.length > 0) {
+        history.push([...px]);
+        px = redoStack.pop();
+        render(ctx, px);
+    }
+}
 
 function showToast(msg) {
     const toast = document.getElementById('toast');
@@ -117,12 +133,7 @@ function showToast(msg) {
 function render(c, d) { 
     if(!c) return; 
     c.clearRect(0,0,32,32); 
-    d.forEach((p, i) => { 
-        if(p) { 
-            c.fillStyle = p; 
-            c.fillRect(i%32, Math.floor(i/32), 1, 1); 
-        } 
-    }); 
+    d.forEach((p, i) => { if(p) { c.fillStyle = p; c.fillRect(i%32, Math.floor(i/32), 1, 1); } }); 
 }
 
 function switchView(view) {
@@ -135,22 +146,14 @@ onAuthStateChanged(auth, u => {
     currentUser = u;
     if(u) {
         onValue(ref(db, 'users/' + u.uid), snap => {
-            if(snap.exists()) {
-                userProfile = snap.val();
-            } else {
-                userProfile = {
-                    name: u.displayName || 'User-' + u.uid.slice(0,5),
-                    photo: u.photoURL || `https://ui-avatars.com/api/?name=${u.uid}`,
-                    bio: 'Anggota baru Givary'
-                };
+            if(snap.exists()) { userProfile = snap.val(); } 
+            else {
+                userProfile = { name: u.displayName || 'User-' + u.uid.slice(0,5), photo: u.photoURL || `https://ui-avatars.com/api/?name=${u.uid}`, bio: 'Anggota baru Givary' };
                 update(ref(db, 'users/' + u.uid), userProfile);
             }
             updateUI();
         }, { onlyOnce: true });
-    } else {
-        userProfile = {};
-        updateUI();
-    }
+    } else { userProfile = {}; updateUI(); }
 });
 
 function updateUI() {
@@ -160,116 +163,56 @@ function updateUI() {
     document.getElementById('u-avatar').src = photo;
 }
 
-document.getElementById('btn-login').onclick = () => {
-    if(currentUser) {
-        openProfileModal();
-    } else {
-        openModal('modal-login');
-    }
-};
-
+document.getElementById('btn-login').onclick = () => { if(currentUser) { openProfileModal(); } else { openModal('modal-login'); } };
 document.getElementById('btn-google-login').onclick = () => {
-    signInWithPopup(auth, provider)
-        .then(() => {
-            closeModal('modal-login');
-            showToast('Login Berhasil');
-        })
-        .catch(e => showToast('Login Gagal: ' + e.message));
+    signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Login Berhasil'); }).catch(e => showToast('Login Gagal'));
 };
-
 document.getElementById('btn-close-login').onclick = () => closeModal('modal-login');
 
 function openProfileModal() {
-    document.getElementById('profile-avatar').src = userProfile.photo || 'https://ui-avatars.com/api/?name=User';
-    document.getElementById('inp-profile-name').value = userProfile.name || '';
-    document.getElementById('inp-profile-bio').value = userProfile.bio || '';
+    document.getElementById('profile-avatar').src = userProfile.photo;
+    document.getElementById('inp-profile-name').value = userProfile.name;
+    document.getElementById('inp-profile-bio').value = userProfile.bio;
     openModal('modal-profile');
 }
 
 document.getElementById('btn-save-profile').onclick = () => {
-    if(!currentUser) return;
     const newName = document.getElementById('inp-profile-name').value.trim();
-    const newBio = document.getElementById('inp-profile-bio').value.trim();
-    if(!newName) {
-        showToast('Nama tidak boleh kosong');
-        return;
-    }
-    update(ref(db, 'users/' + currentUser.uid), {
-        name: newName,
-        bio: newBio,
-        photo: userProfile.photo
-    }).then(() => {
-        showToast('Profil diupdate');
-        closeModal('modal-profile');
-    });
+    if(!newName) return showToast('Nama kosong');
+    update(ref(db, 'users/' + currentUser.uid), { name: newName, bio: document.getElementById('inp-profile-bio').value.trim(), photo: userProfile.photo })
+    .then(() => { showToast('Profil diupdate'); closeModal('modal-profile'); });
 };
 
-document.getElementById('btn-logout').onclick = () => {
-    if(confirm('Keluar dari akun?')) {
-        signOut(auth).then(() => {
-            closeModal('modal-profile');
-            showToast('Logout Berhasil');
-        });
-    }
-};
-
+document.getElementById('btn-logout').onclick = () => { if(confirm('Logout?')) { signOut(auth).then(() => { closeModal('modal-profile'); showToast('Logout Berhasil'); }); } };
 document.getElementById('btn-close-profile').onclick = () => closeModal('modal-profile');
 
-function openModal(id) {
-    document.getElementById(id).classList.add('open');
-}
-
-function closeModal(id) {
-    document.getElementById(id).classList.remove('open');
-}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 onValue(ref(db, 'artworks'), snap => {
     const grid = document.getElementById('gallery-grid'); 
     grid.innerHTML = '';
-    if(!snap.exists()) { 
-        grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; opacity:0.5; padding:50px;">Belum ada karya</p>'; 
-        return; 
-    }
+    if(!snap.exists()) return grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; opacity:0.5; padding:50px;">Belum ada karya</p>';
     const artworks = [];
-    snap.forEach(child => {
-        artworks.push({ id: child.key, ...child.val() });
-    });
+    snap.forEach(child => { artworks.push({ id: child.key, ...child.val() }); });
     artworks.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     artworks.forEach(data => {
-        const photo = data.authorPhoto || `https://ui-avatars.com/api/?name=${data.authorName}`;
         const div = document.createElement('div'); 
         div.className = 'art-card';
-        div.innerHTML = `
-            <div class="canvas-container">
-                <canvas id="c-${data.id}" width="32" height="32"></canvas>
-            </div>
-            <div class="art-overlay">
-                <b style="font-size:0.85rem">${data.title || 'Untitled'}</b>
-                <div class="author-tag">
-                    <img src="${photo}">
-                    <span>${data.authorName || 'Anonim'}</span>
-                </div>
-            </div>
-        `;
+        div.innerHTML = `<div class="canvas-container"><canvas id="c-${data.id}" width="32" height="32"></canvas></div>
+            <div class="art-overlay"><b style="font-size:0.85rem">${data.title || 'Untitled'}</b><div class="author-tag"><img src="${data.authorPhoto}"><span>${data.authorName}</span></div></div>`;
         div.onclick = () => openDetailView(data);
         grid.appendChild(div);
-        setTimeout(() => {
-            const c = document.getElementById(`c-${data.id}`);
-            if(c) render(c.getContext('2d'), JSON.parse(data.pixels));
-        }, 10);
+        setTimeout(() => { const c = document.getElementById(`c-${data.id}`); if(c) render(c.getContext('2d'), JSON.parse(data.pixels)); }, 10);
     });
 });
 
 function openDetailView(data) {
     activeId = data.id;
     document.getElementById('d-title').innerText = data.title || 'Untitled';
-    const photo = data.authorPhoto || `https://ui-avatars.com/api/?name=${data.authorName}`;
-    document.getElementById('d-meta').innerHTML = `
-        <img src="${photo}" style="width:24px; height:24px; border-radius:50%;">
-        <span>Oleh <b>${data.authorName || 'Anonim'}</b></span>
-    `;
-    const detailCanvas = document.getElementById('detail-canvas');
-    render(detailCanvas.getContext('2d'), JSON.parse(data.pixels));
+    document.getElementById('d-desc').innerText = data.description || '';
+    document.getElementById('d-meta').innerHTML = `<img src="${data.authorPhoto}" style="width:24px; height:24px; border-radius:50%;"><span>Oleh <b>${data.authorName}</b></span>`;
+    render(document.getElementById('detail-canvas').getContext('2d'), JSON.parse(data.pixels));
     switchView('detail');
     loadComments(data.id);
 }
@@ -278,37 +221,16 @@ function loadComments(id) {
     const list = document.getElementById('comment-list');
     onValue(ref(db, 'comments/' + id), s => {
         list.innerHTML = '';
-        if(!s.exists()) { 
-            list.innerHTML = '<p style="opacity:0.3; font-size:0.85rem; padding:10px;">Belum ada komentar</p>'; 
-            return; 
-        }
-        s.forEach(c => {
-            const v = c.val();
-            list.innerHTML += `
-                <div style="background:var(--glass); padding:10px; border-radius:10px; margin-bottom:8px; font-size:0.85rem">
-                    <b style="color:var(--primary)">${v.authorName}</b>: ${v.text}
-                </div>
-            `;
-        });
+        if(!s.exists()) return list.innerHTML = '<p style="opacity:0.3; font-size:0.85rem; padding:10px;">Belum ada komentar</p>';
+        s.forEach(c => { const v = c.val(); list.innerHTML += `<div style="background:var(--glass); padding:10px; border-radius:10px; margin-bottom:8px; font-size:0.85rem"><b style="color:var(--primary)">${v.authorName}</b>: ${v.text}</div>`; });
     });
 }
 
 document.getElementById('btn-send').onclick = () => {
     const text = document.getElementById('inp-comment').value.trim();
     if(!text) return;
-    if(!currentUser) {
-        showToast('Login diperlukan');
-        openModal('modal-login');
-        return;
-    }
-    push(ref(db, 'comments/' + activeId), { 
-        text, 
-        authorName: userProfile.name || 'Anonim',
-        timestamp: Date.now()
-    }).then(() => {
-        document.getElementById('inp-comment').value = '';
-        showToast('Terkirim');
-    });
+    if(!currentUser) { showToast('Login diperlukan'); openModal('modal-login'); return; }
+    push(ref(db, 'comments/' + activeId), { text, authorName: userProfile.name, timestamp: Date.now() }).then(() => { document.getElementById('inp-comment').value = ''; });
 };
 
 const draw = (e) => {
@@ -320,14 +242,9 @@ const draw = (e) => {
     const y = Math.floor((cy-r.top)*(32/r.height));
     if(x>=0 && x<32 && y>=0 && y<32) {
         const idx = y*32+x;
-        if(tool === 'pencil') {
-            px[idx] = color;
-        } else if(tool === 'eraser') {
-            px[idx] = null;
-        } else if(tool === 'bucket') {
-            floodFill(x, y, color);
-            drawing = false;
-        }
+        if(tool === 'pencil') px[idx] = color;
+        else if(tool === 'eraser') px[idx] = null;
+        else if(tool === 'bucket') { floodFill(x, y, color); drawing = false; }
         render(ctx, px);
     }
 };
@@ -337,58 +254,43 @@ function floodFill(x, y, newColor) {
     const targetColor = px[idx];
     if(targetColor === newColor) return;
     const stack = [idx];
-    const visited = new Set();
     while(stack.length) {
         const i = stack.pop();
-        if(visited.has(i)) continue;
-        const cx = i % 32;
-        const cy = Math.floor(i / 32);
-        if(cx < 0 || cx >= 32 || cy < 0 || cy >= 32) continue;
-        if(px[i] !== targetColor) continue;
+        const cx = i % 32; const cy = Math.floor(i / 32);
+        if(cx < 0 || cx >= 32 || cy < 0 || cy >= 32 || px[i] !== targetColor) continue;
         px[i] = newColor;
-        visited.add(i);
         stack.push(i-1, i+1, i-32, i+32);
     }
 }
 
-canvas.onmousedown = (e) => { drawing=true; draw(e); }
+canvas.onmousedown = (e) => { saveHistory(); drawing=true; draw(e); }
 window.onmouseup = () => drawing = false;
 canvas.onmousemove = draw;
-canvas.ontouchstart = (e) => { e.preventDefault(); drawing=true; draw(e); }
+canvas.ontouchstart = (e) => { e.preventDefault(); saveHistory(); drawing=true; draw(e); }
 canvas.ontouchmove = (e) => { e.preventDefault(); draw(e); }
 canvas.ontouchend = () => drawing = false;
 
-document.getElementById('color-picker').oninput = (e) => {
-    color = e.target.value;
-    tool = 'pencil';
-    updateToolButtons();
-};
+document.getElementById('t-undo').onclick = undo;
+document.getElementById('t-redo').onclick = redo;
 
-document.getElementById('t-pencil').onclick = () => {
-    tool = 'pencil';
-    updateToolButtons();
-};
-
-document.getElementById('t-eraser').onclick = () => {
-    tool = 'eraser';
-    updateToolButtons();
-};
-
-document.getElementById('t-bucket').onclick = () => {
-    tool = 'bucket';
-    updateToolButtons();
-};
+document.getElementById('color-picker').oninput = (e) => { color = e.target.value; tool = 'pencil'; updateToolButtons(); };
+document.getElementById('t-pencil').onclick = () => { tool = 'pencil'; updateToolButtons(); };
+document.getElementById('t-eraser').onclick = () => { tool = 'eraser'; updateToolButtons(); };
+document.getElementById('t-bucket').onclick = () => { tool = 'bucket'; updateToolButtons(); };
 
 function updateToolButtons() {
-    document.getElementById('t-pencil').style.background = tool === 'pencil' ? 'var(--primary)' : 'var(--glass-heavy)';
-    document.getElementById('t-eraser').style.background = tool === 'eraser' ? 'var(--primary)' : 'var(--glass-heavy)';
-    document.getElementById('t-bucket').style.background = tool === 'bucket' ? 'var(--primary)' : 'var(--glass-heavy)';
+    document.querySelectorAll('.tool-btn').forEach(b => {
+        b.style.background = 'var(--glass-heavy)';
+        b.classList.remove('active');
+    });
+    const activeTool = document.getElementById('t-' + tool);
+    if(activeTool) {
+        activeTool.style.background = 'var(--primary)';
+        activeTool.classList.add('active');
+    }
 }
 
-document.getElementById('btn-upload-img').onclick = () => {
-    document.getElementById('file-upload').click();
-};
-
+document.getElementById('btn-upload-img').onclick = () => document.getElementById('file-upload').click();
 document.getElementById('file-upload').onchange = (e) => {
     const file = e.target.files[0];
     if(!file) return;
@@ -396,72 +298,31 @@ document.getElementById('file-upload').onchange = (e) => {
     reader.onload = (evt) => {
         const img = new Image();
         img.onload = () => {
-            const temp = document.createElement('canvas');
-            temp.width = 32;
-            temp.height = 32;
-            const tempCtx = temp.getContext('2d');
+            saveHistory();
+            const tempCtx = document.createElement('canvas').getContext('2d');
+            tempCtx.canvas.width = 32; tempCtx.canvas.height = 32;
             tempCtx.drawImage(img, 0, 0, 32, 32);
-            const imageData = tempCtx.getImageData(0, 0, 32, 32);
-            const data = imageData.data;
+            const data = tempCtx.getImageData(0, 0, 32, 32).data;
             for(let i = 0; i < 1024; i++) {
-                const r = data[i*4];
-                const g = data[i*4+1];
-                const b = data[i*4+2];
-                const a = data[i*4+3];
-                if(a > 128) {
-                    px[i] = `#${((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1)}`;
-                } else {
-                    px[i] = null;
-                }
+                const r = data[i*4], g = data[i*4+1], b = data[i*4+2], a = data[i*4+3];
+                px[i] = a > 128 ? `#${((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1)}` : null;
             }
             render(ctx, px);
             showToast('Konversi Berhasil');
-            e.target.value = '';
         };
         img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
 };
 
-document.getElementById('btn-new').onclick = () => {
-    px.fill(null);
-    render(ctx, px);
-    switchView('editor');
-};
-
-document.getElementById('btn-save').onclick = () => {
-    if(!currentUser) {
-        showToast('Login diperlukan');
-        openModal('modal-login');
-        return;
-    }
-    openModal('modal-publish');
-};
-
+document.getElementById('btn-new').onclick = () => { px.fill(null); history = []; redoStack = []; render(ctx, px); switchView('editor'); };
+document.getElementById('btn-save').onclick = () => { if(!currentUser) { showToast('Login diperlukan'); openModal('modal-login'); return; } openModal('modal-publish'); };
 document.getElementById('btn-publish').onclick = () => {
     const title = document.getElementById('inp-title').value.trim();
-    const desc = document.getElementById('inp-desc').value.trim();
-    if(!title) {
-        showToast('Judul diperlukan');
-        return;
-    }
+    if(!title) return showToast('Judul diperlukan');
     push(ref(db, 'artworks'), {
-        title,
-        description: desc,
-        pixels: JSON.stringify(px),
-        authorName: userProfile.name || 'Anonim',
-        authorPhoto: userProfile.photo || `https://ui-avatars.com/api/?name=${currentUser.uid}`,
-        authorUid: currentUser.uid,
-        timestamp: Date.now()
-    }).then(() => {
-        showToast('Berhasil Publish');
-        closeModal('modal-publish');
-        document.getElementById('inp-title').value = '';
-        document.getElementById('inp-desc').value = '';
-        switchView('home');
-    });
+        title, description: document.getElementById('inp-desc').value.trim(),
+        pixels: JSON.stringify(px), authorName: userProfile.name, authorPhoto: userProfile.photo, authorUid: currentUser.uid, timestamp: Date.now()
+    }).then(() => { showToast('Berhasil Publish'); closeModal('modal-publish'); switchView('home'); });
 };
-
-document.getElementById('btn-cancel-publish').onclick = () => {
-    closeModal('modal-publish');
-};
+document.getElementById('btn-cancel-publish').onclick = () => closeModal('modal-publish');
