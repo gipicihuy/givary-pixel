@@ -26,6 +26,7 @@ let tool = 'pencil';
 let color = '#3b82f6'; 
 let drawing = false; 
 let activeId = null;
+let currentActivePixels = "[]";
 
 // --- UI SETUP ---
 document.getElementById('givary-app').innerHTML = `
@@ -57,7 +58,7 @@ document.getElementById('givary-app').innerHTML = `
                 </button>
             </div>
             
-            <div style="width:340px; height:340px; background:repeating-conic-gradient(#ddd 0% 25%, white 0% 50%) 50% / 20px 20px; border-radius:24px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+            <div style="width:340px; height:340px; background:repeating-conic-gradient(#ddd 0% 25%, white 0% 50%) 50% / 20px 20px; border-radius:24px; overflow:hidden;">
                 <canvas id="main-canvas" width="32" height="32" style="width:100%;height:100%;image-rendering:pixelated"></canvas>
             </div>
             
@@ -79,24 +80,23 @@ document.getElementById('givary-app').innerHTML = `
                 <i class="fas fa-arrow-left"></i> Kembali
             </button>
             <div style="width:100%; max-width:400px; margin:0 auto;">
-                <div class="canvas-container" style="border-radius:20px; margin-bottom:10px; position:relative;">
-                    <canvas id="detail-canvas" width="32" height="32" style="width:100%; aspect-ratio:1; image-rendering:pixelated; display:block;"></canvas>
+                <div class="canvas-container" style="border-radius:20px; margin-bottom:15px;">
+                    <canvas id="detail-canvas" width="32" height="32" style="width:100%; image-rendering:pixelated; display:block;"></canvas>
                 </div>
                 
-                <button id="btn-download" style="width:100%; background:var(--glass-heavy); border:1px solid var(--glass-heavy); color:white; padding:12px; border-radius:12px; margin-bottom:20px; cursor:pointer; font-weight:bold;">
-                    <i class="fas fa-download"></i> Download PNG
+                <button id="btn-download" style="width:100%; background:var(--primary); border:none; color:white; padding:12px; border-radius:12px; margin-bottom:20px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-download"></i> DOWNLOAD PNG
                 </button>
 
-                <h2 id="d-title" style="margin:0 0 5px"></h2>
-                <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:20px;"></div>
+                <h2 id="d-title" style="margin:0 0 10px 0"></h2>
                 
-                <div style="background:var(--glass-heavy); padding:15px; border-radius:15px; border-left:4px solid var(--primary); margin-bottom:25px;">
-                    <p id="d-desc" style="color:white; font-size:0.95rem; line-height:1.5; margin:0;"></p>
-                </div>
+                <p id="d-desc" style="color:var(--text-dim); font-size:1rem; line-height:1.5; margin-bottom:15px;"></p>
+                
+                <div id="d-meta" style="display:flex; align-items:center; gap:10px; margin-bottom:25px; padding:10px; background:var(--glass); border-radius:12px;"></div>
 
                 <div style="border-top:1px solid var(--glass-heavy); padding-top:20px;">
                     <h3 style="margin:0 0 15px 0; font-size:1.1rem;"><i class="fas fa-comments"></i> Komentar</h3>
-                    <div id="comment-list" style="margin-bottom:15px; max-height:300px; overflow-y:auto;"></div>
+                    <div id="comment-list" style="margin-bottom:15px; max-height:400px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
                     <div style="display:flex; gap:10px;">
                         <input id="inp-comment" placeholder="Tulis komentar..." style="flex:1; background:var(--glass); border:1px solid var(--glass-heavy); color:white; padding:12px; border-radius:12px;">
                         <button id="btn-send" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:12px; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
@@ -111,47 +111,13 @@ document.getElementById('givary-app').innerHTML = `
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 
-// --- RENDERING FIX (Ngehapus residu transparan) ---
+// --- SYSTEM UTILS ---
 function render(c, d) { 
     if(!c) return; 
     c.clearRect(0,0,32,32); 
-    // Matikan smoothing supaya pixel tajam
     c.imageSmoothingEnabled = false;
-    d.forEach((p, i) => { 
-        if(p) { 
-            c.fillStyle = p; 
-            c.fillRect(i%32, Math.floor(i/32), 1, 1); 
-        } 
-    }); 
+    d.forEach((p, i) => { if(p) { c.fillStyle = p; c.fillRect(i%32, Math.floor(i/32), 1, 1); } }); 
 }
-
-// --- DOWNLOAD FEATURE ---
-document.getElementById('btn-download').onclick = () => {
-    const detailCanvas = document.getElementById('detail-canvas');
-    // Buat canvas besar sementara (upscale) biar gak pecah pas didownload
-    const tempCanvas = document.createElement('canvas');
-    const tCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = 512;
-    tempCanvas.height = 512;
-    tCtx.imageSmoothingEnabled = false;
-    
-    // Gambar ulang pixel data ke canvas besar
-    const activePixels = JSON.parse(currentActivePixels);
-    activePixels.forEach((p, i) => {
-        if(p) {
-            tCtx.fillStyle = p;
-            tCtx.fillRect((i%32)*16, Math.floor(i/32)*16, 16, 16);
-        }
-    });
-
-    const link = document.createElement('a');
-    link.download = `GivaryPixel_${Date.now()}.png`;
-    link.href = tempCanvas.toDataURL("image/png");
-    link.click();
-};
-
-// Variabel penampung pixel buat download
-let currentActivePixels = "[]";
 
 function showToast(msg) {
     const toast = document.getElementById('toast');
@@ -166,6 +132,28 @@ function switchView(view) {
 }
 window.backHome = () => switchView('home');
 
+// --- DOWNLOAD FEATURE ---
+document.getElementById('btn-download').onclick = () => {
+    const tempCanvas = document.createElement('canvas');
+    const tCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = 1024; // Upscale HD
+    tempCanvas.height = 1024;
+    tCtx.imageSmoothingEnabled = false;
+    
+    const activePixels = JSON.parse(currentActivePixels);
+    activePixels.forEach((p, i) => {
+        if(p) {
+            tCtx.fillStyle = p;
+            tCtx.fillRect((i%32)*32, Math.floor(i/32)*32, 32, 32);
+        }
+    });
+
+    const link = document.createElement('a');
+    link.download = `GivaryPixel_${Date.now()}.png`;
+    link.href = tempCanvas.toDataURL("image/png");
+    link.click();
+};
+
 // --- AUTH & PROFILE ---
 onAuthStateChanged(auth, u => {
     currentUser = u;
@@ -173,7 +161,7 @@ onAuthStateChanged(auth, u => {
         onValue(ref(db, 'users/' + u.uid), snap => {
             if(snap.exists()) { userProfile = snap.val(); } 
             else {
-                userProfile = { name: u.displayName || 'User-' + u.uid.slice(0,5), photo: u.photoURL || `https://ui-avatars.com/api/?name=${u.uid}`, bio: 'Member baru' };
+                userProfile = { name: u.displayName || 'User', photo: u.photoURL || `https://ui-avatars.com/api/?name=User`, bio: 'Pixel Artist' };
                 update(ref(db, 'users/' + u.uid), userProfile);
             }
             updateUI();
@@ -185,30 +173,6 @@ function updateUI() {
     document.getElementById('u-name').innerText = currentUser ? (userProfile.name || 'User') : 'Login';
     document.getElementById('u-avatar').src = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
 }
-
-document.getElementById('btn-login').onclick = () => { if(currentUser) { openProfileModal(); } else { openModal('modal-login'); } };
-document.getElementById('btn-google-login').onclick = () => {
-    signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Berhasil Login'); }).catch(() => showToast('Gagal Login'));
-};
-
-function openProfileModal() {
-    document.getElementById('profile-avatar').src = userProfile.photo;
-    document.getElementById('inp-profile-name').value = userProfile.name;
-    document.getElementById('inp-profile-bio').value = userProfile.bio;
-    openModal('modal-profile');
-}
-
-document.getElementById('btn-save-profile').onclick = () => {
-    const newName = document.getElementById('inp-profile-name').value.trim();
-    if(!newName) return showToast('Nama kosong!');
-    update(ref(db, 'users/' + currentUser.uid), { 
-        name: newName, 
-        bio: document.getElementById('inp-profile-bio').value.trim(), 
-        photo: userProfile.photo 
-    }).then(() => { showToast('Profil Update'); closeModal('modal-profile'); });
-};
-
-document.getElementById('btn-logout').onclick = () => { if(confirm('Logout?')) signOut(auth).then(() => closeModal('modal-profile')); };
 
 // --- GALLERY ---
 onValue(ref(db, 'artworks'), snap => {
@@ -241,28 +205,33 @@ onValue(ref(db, 'artworks'), snap => {
 
         onValue(ref(db, 'users/' + data.authorUid), uSnap => {
             const u = uSnap.val();
-            if(u) {
+            if(u && document.getElementById(nameId)) {
                 document.getElementById(nameId).innerText = u.name;
                 document.getElementById(picId).src = u.photo;
             }
         });
 
         setTimeout(() => { 
-            const c = document.getElementById(`c-${data.id}`); 
-            if(c) render(c.getContext('2d'), JSON.parse(data.pixels)); 
-        }, 20);
+            const canvasEl = document.getElementById(`c-${data.id}`);
+            if(canvasEl) render(canvasEl.getContext('2d'), JSON.parse(data.pixels)); 
+        }, 50);
     });
 });
 
 function openDetailView(data) {
     activeId = data.id;
-    currentActivePixels = data.pixels; // Simpan untuk download
+    currentActivePixels = data.pixels;
     onValue(ref(db, 'users/' + data.authorUid), s => {
         const u = s.val();
         if(u) {
             document.getElementById('d-title').innerText = data.title;
-            document.getElementById('d-desc').innerText = data.description || 'No Description';
-            document.getElementById('d-meta').innerHTML = `<img src="${u.photo}" style="width:24px;border-radius:50%"> ${u.name}`;
+            document.getElementById('d-desc').innerText = data.description || 'Tidak ada deskripsi.';
+            document.getElementById('d-meta').innerHTML = `
+                <img src="${u.photo}" style="width:35px; height:35px; border-radius:50%; border:2px solid var(--primary);">
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-size:0.9rem; font-weight:bold; color:white;">${u.name}</span>
+                    <span style="font-size:0.75rem; color:var(--text-dim);">Art Owner</span>
+                </div>`;
         }
     }, { onlyOnce: true });
 
@@ -275,21 +244,34 @@ function loadComments(id) {
     const list = document.getElementById('comment-list');
     onValue(ref(db, 'comments/' + id), s => {
         list.innerHTML = '';
-        if(!s.exists()) return;
+        if(!s.exists()) return list.innerHTML = '<p style="opacity:0.3; text-align:center;">Belum ada komentar</p>';
         s.forEach(c => { 
             const v = c.val(); 
-            list.innerHTML += `<div style="background:var(--glass); padding:10px; border-radius:10px; margin-bottom:8px; font-size:0.8rem"><b>${v.authorName}</b>: ${v.text}</div>`; 
+            onValue(ref(db, 'users/' + v.authorUid), uSnap => {
+                const u = uSnap.val() || { photo: 'https://ui-avatars.com/api/?name=?', name: v.authorName };
+                const cDiv = document.createElement('div');
+                cDiv.style = "display:flex; gap:12px; background:var(--glass); padding:12px; border-radius:15px; align-items:flex-start;";
+                cDiv.innerHTML = `
+                    <img src="${u.photo}" style="width:32px; height:32px; border-radius:50%;">
+                    <div style="flex:1">
+                        <b style="font-size:0.8rem; color:var(--primary);">${u.name}</b>
+                        <p style="font-size:0.85rem; margin:3px 0 0 0; color:white;">${v.text}</p>
+                    </div>
+                `;
+                list.appendChild(cDiv);
+            }, { onlyOnce: true });
         });
     });
 }
 
 document.getElementById('btn-send').onclick = () => {
-    if(!currentUser) { showToast('Login dulu kawan!'); openModal('modal-login'); return; }
+    if(!currentUser) { showToast('Harap login!'); openModal('modal-login'); return; }
     const text = document.getElementById('inp-comment').value.trim();
     if(!text) return;
     push(ref(db, 'comments/' + activeId), { 
         text, 
         authorName: userProfile.name, 
+        authorUid: currentUser.uid, 
         timestamp: Date.now() 
     }).then(() => { document.getElementById('inp-comment').value = ''; });
 };
@@ -312,8 +294,7 @@ const draw = (e) => {
 };
 
 function floodFill(x, y, newColor) {
-    const idx = y*32+x;
-    const targetColor = px[idx];
+    const idx = y*32+x; const targetColor = px[idx];
     if(targetColor === newColor) return;
     const stack = [idx];
     while(stack.length) {
@@ -329,27 +310,23 @@ function saveHistory() { history.push([...px]); if(history.length > 30) history.
 document.getElementById('t-undo').onclick = () => { if(history.length > 0) { redoStack.push([...px]); px = history.pop(); render(ctx, px); } };
 document.getElementById('t-redo').onclick = () => { if(redoStack.length > 0) { history.push([...px]); px = redoStack.pop(); render(ctx, px); } };
 
-canvas.onmousedown = (e) => { saveHistory(); drawing=true; draw(e); }
+canvas.onmousedown = (e) => { saveHistory(); drawing=true; draw(e); };
 window.onmouseup = () => drawing = false;
 canvas.onmousemove = draw;
-canvas.ontouchstart = (e) => { e.preventDefault(); saveHistory(); drawing=true; draw(e); }
-canvas.ontouchmove = (e) => { e.preventDefault(); draw(e); }
+canvas.ontouchstart = (e) => { e.preventDefault(); saveHistory(); drawing=true; draw(e); };
+canvas.ontouchmove = (e) => { e.preventDefault(); draw(e); };
 canvas.ontouchend = () => drawing = false;
 
 document.getElementById('color-picker').oninput = (e) => { color = e.target.value; tool = 'pencil'; updateToolButtons(); };
 document.getElementById('t-pencil').onclick = () => { tool = 'pencil'; updateToolButtons(); };
 document.getElementById('t-eraser').onclick = () => { tool = 'eraser'; updateToolButtons(); };
 document.getElementById('t-bucket').onclick = () => { tool = 'bucket'; updateToolButtons(); };
+function updateToolButtons() { document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); document.getElementById('t-' + tool).classList.add('active'); }
 
-function updateToolButtons() {
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('t-' + tool).classList.add('active');
-}
-
+// --- IMAGE CONVERT ---
 document.getElementById('btn-upload-img').onclick = () => document.getElementById('file-upload').click();
 document.getElementById('file-upload').onchange = (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
+    const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
         const img = new Image();
@@ -357,27 +334,27 @@ document.getElementById('file-upload').onchange = (e) => {
             saveHistory();
             const tC = document.createElement('canvas').getContext('2d');
             tC.canvas.width = 32; tC.canvas.height = 32;
-            tCtx.imageSmoothingEnabled = false; // Penting biar gak blur
+            tC.imageSmoothingEnabled = false;
             tC.drawImage(img, 0, 0, 32, 32);
             const data = tC.getImageData(0, 0, 32, 32).data;
             for(let i = 0; i < 1024; i++) {
                 const r = data[i*4], g = data[i*4+1], b = data[i*4+2], a = data[i*4+3];
                 px[i] = a > 128 ? `#${((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1)}` : null;
             }
-            render(ctx, px);
-            showToast('Konversi Selesai');
+            render(ctx, px); showToast('Konversi Selesai');
         };
         img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
 };
 
-// --- PUBLISH ---
+// --- MODALS & EVENTS ---
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
 document.getElementById('btn-new').onclick = () => { px.fill(null); history = []; redoStack = []; render(ctx, px); switchView('editor'); };
 document.getElementById('btn-save').onclick = () => { if(!currentUser) { showToast('Login dulu!'); openModal('modal-login'); return; } openModal('modal-publish'); };
+document.getElementById('btn-login').onclick = () => { if(currentUser) { openProfileModal(); } else { openModal('modal-login'); } };
+document.getElementById('btn-google-login').onclick = () => { signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Login Berhasil'); }).catch(() => showToast('Login Gagal')); };
 
 document.getElementById('btn-publish').onclick = () => {
     const title = document.getElementById('inp-title').value.trim();
@@ -388,7 +365,7 @@ document.getElementById('btn-publish').onclick = () => {
         pixels: JSON.stringify(px), 
         authorUid: currentUser.uid, 
         timestamp: Date.now()
-    }).then(() => { showToast('Published!'); closeModal('modal-publish'); switchView('home'); });
+    }).then(() => { showToast('Berhasil Publish!'); closeModal('modal-publish'); switchView('home'); });
 };
 
 document.getElementById('btn-cancel-publish').onclick = () => closeModal('modal-publish');
