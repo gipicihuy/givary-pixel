@@ -81,11 +81,19 @@ document.getElementById('givary-app').innerHTML = `
                 <div class="canvas-container" style="border-radius:20px; margin-bottom:20px;">
                     <canvas id="detail-canvas" width="32" height="32"></canvas>
                 </div>
-                <h2 id="d-title" style="margin:20px 0 10px"></h2>
-                <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:10px;"></div>
-                <p id="d-desc" style="color:var(--text-dim); font-size:0.9rem; line-height:1.5; margin-bottom:20px;"></p>
+                
+                <h2 id="d-title" style="margin:20px 0 5px"></h2>
+                <div id="d-meta" style="display:flex; align-items:center; gap:8px; color:var(--text-dim); font-size:0.9rem; margin-bottom:20px;"></div>
+                
+                <div style="background:var(--glass-heavy); padding:15px; border-radius:15px; border-left:4px solid var(--primary); margin-bottom:25px;">
+                    <small style="display:block; color:var(--primary); font-weight:bold; text-transform:uppercase; font-size:0.7rem; margin-bottom:5px;">
+                        <i class="fas fa-info-circle"></i> Deskripsi Karya
+                    </small>
+                    <p id="d-desc" style="color:white; font-size:0.95rem; line-height:1.5; margin:0;"></p>
+                </div>
+
                 <div style="border-top:1px solid var(--glass-heavy); padding-top:20px;">
-                    <h3 style="margin:0 0 15px 0;"><i class="fas fa-comments"></i> Komentar</h3>
+                    <h3 style="margin:0 0 15px 0; font-size:1.1rem;"><i class="fas fa-comments"></i> Komentar</h3>
                     <div id="comment-list" style="margin-bottom:15px; max-height:300px; overflow-y:auto;"></div>
                     <div style="display:flex; gap:10px;">
                         <input id="inp-comment" placeholder="Tulis komentar..." style="flex:1; background:var(--glass); border:1px solid var(--glass-heavy); color:white; padding:12px; border-radius:12px;">
@@ -101,6 +109,7 @@ document.getElementById('givary-app').innerHTML = `
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 
+// --- HISTORY LOGIC ---
 function saveHistory() {
     history.push([...px]);
     if (history.length > 30) history.shift();
@@ -123,17 +132,19 @@ function redo() {
     }
 }
 
+// --- RENDERING ---
+function render(c, d) { 
+    if(!c) return; 
+    c.clearRect(0,0,32,32); 
+    d.forEach((p, i) => { if(p) { c.fillStyle = p; c.fillRect(i%32, Math.floor(i/32), 1, 1); } }); 
+}
+
+// --- SYSTEM ---
 function showToast(msg) {
     const toast = document.getElementById('toast');
     toast.innerText = msg;
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);
-}
-
-function render(c, d) { 
-    if(!c) return; 
-    c.clearRect(0,0,32,32); 
-    d.forEach((p, i) => { if(p) { c.fillStyle = p; c.fillRect(i%32, Math.floor(i/32), 1, 1); } }); 
 }
 
 function switchView(view) {
@@ -142,6 +153,7 @@ function switchView(view) {
 }
 window.backHome = () => switchView('home');
 
+// --- AUTH & USER PROFILE ---
 onAuthStateChanged(auth, u => {
     currentUser = u;
     if(u) {
@@ -152,22 +164,19 @@ onAuthStateChanged(auth, u => {
                 update(ref(db, 'users/' + u.uid), userProfile);
             }
             updateUI();
-        }, { onlyOnce: true });
+        });
     } else { userProfile = {}; updateUI(); }
 });
 
 function updateUI() {
-    const name = currentUser ? (userProfile.name || 'User') : 'Login';
-    const photo = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
-    document.getElementById('u-name').innerText = name;
-    document.getElementById('u-avatar').src = photo;
+    document.getElementById('u-name').innerText = currentUser ? (userProfile.name || 'User') : 'Login';
+    document.getElementById('u-avatar').src = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
 }
 
 document.getElementById('btn-login').onclick = () => { if(currentUser) { openProfileModal(); } else { openModal('modal-login'); } };
 document.getElementById('btn-google-login').onclick = () => {
-    signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Login Berhasil'); }).catch(e => showToast('Login Gagal'));
+    signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Login Berhasil'); }).catch(() => showToast('Login Gagal'));
 };
-document.getElementById('btn-close-login').onclick = () => closeModal('modal-login');
 
 function openProfileModal() {
     document.getElementById('profile-avatar').src = userProfile.photo;
@@ -178,40 +187,73 @@ function openProfileModal() {
 
 document.getElementById('btn-save-profile').onclick = () => {
     const newName = document.getElementById('inp-profile-name').value.trim();
-    if(!newName) return showToast('Nama kosong');
-    update(ref(db, 'users/' + currentUser.uid), { name: newName, bio: document.getElementById('inp-profile-bio').value.trim(), photo: userProfile.photo })
-    .then(() => { showToast('Profil diupdate'); closeModal('modal-profile'); });
+    if(!newName) return showToast('Nama tidak boleh kosong');
+    update(ref(db, 'users/' + currentUser.uid), { 
+        name: newName, 
+        bio: document.getElementById('inp-profile-bio').value.trim(), 
+        photo: userProfile.photo 
+    }).then(() => { showToast('Profil diupdate'); closeModal('modal-profile'); });
 };
 
-document.getElementById('btn-logout').onclick = () => { if(confirm('Logout?')) { signOut(auth).then(() => { closeModal('modal-profile'); showToast('Logout Berhasil'); }); } };
-document.getElementById('btn-close-profile').onclick = () => closeModal('modal-profile');
+document.getElementById('btn-logout').onclick = () => { if(confirm('Logout dari akun?')) signOut(auth).then(() => closeModal('modal-profile')); };
 
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
+// --- GALLERY & DYNAMIC NAMES ---
 onValue(ref(db, 'artworks'), snap => {
     const grid = document.getElementById('gallery-grid'); 
     grid.innerHTML = '';
     if(!snap.exists()) return grid.innerHTML = '<p style="grid-column:1/-1; text-align:center; opacity:0.5; padding:50px;">Belum ada karya</p>';
+    
     const artworks = [];
     snap.forEach(child => { artworks.push({ id: child.key, ...child.val() }); });
     artworks.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     artworks.forEach(data => {
         const div = document.createElement('div'); 
         div.className = 'art-card';
-        div.innerHTML = `<div class="canvas-container"><canvas id="c-${data.id}" width="32" height="32"></canvas></div>
-            <div class="art-overlay"><b style="font-size:0.85rem">${data.title || 'Untitled'}</b><div class="author-tag"><img src="${data.authorPhoto}"><span>${data.authorName}</span></div></div>`;
+        const nameId = `n-${data.id}`;
+        const picId = `p-${data.id}`;
+
+        div.innerHTML = `
+            <div class="canvas-container"><canvas id="c-${data.id}" width="32" height="32"></canvas></div>
+            <div class="art-overlay">
+                <b style="font-size:0.85rem">${data.title || 'Untitled'}</b>
+                <div class="author-tag">
+                    <img id="${picId}" src="https://ui-avatars.com/api/?name=...">
+                    <span id="${nameId}">Loading...</span>
+                </div>
+            </div>`;
+        
         div.onclick = () => openDetailView(data);
         grid.appendChild(div);
+
+        // Update nama/foto secara real-time berdasarkan authorUid
+        onValue(ref(db, 'users/' + data.authorUid), uSnap => {
+            const u = uSnap.val();
+            const elN = document.getElementById(nameId);
+            const elP = document.getElementById(picId);
+            if(u && elN && elP) {
+                elN.innerText = u.name;
+                elP.src = u.photo;
+                data.authorName = u.name;
+                data.authorPhoto = u.photo;
+            }
+        });
+
         setTimeout(() => { const c = document.getElementById(`c-${data.id}`); if(c) render(c.getContext('2d'), JSON.parse(data.pixels)); }, 10);
     });
 });
 
 function openDetailView(data) {
     activeId = data.id;
-    document.getElementById('d-title').innerText = data.title || 'Untitled';
-    document.getElementById('d-desc').innerText = data.description || '';
-    document.getElementById('d-meta').innerHTML = `<img src="${data.authorPhoto}" style="width:24px; height:24px; border-radius:50%;"><span>Oleh <b>${data.authorName}</b></span>`;
+    onValue(ref(db, 'users/' + data.authorUid), s => {
+        const u = s.val();
+        if(u) {
+            document.getElementById('d-title').innerText = data.title || 'Untitled';
+            document.getElementById('d-desc').innerText = data.description || 'Tidak ada deskripsi.';
+            document.getElementById('d-meta').innerHTML = `<img src="${u.photo}" style="width:24px; height:24px; border-radius:50%;"><span>Oleh <b>${u.name}</b></span>`;
+        }
+    }, { onlyOnce: true });
+
     render(document.getElementById('detail-canvas').getContext('2d'), JSON.parse(data.pixels));
     switchView('detail');
     loadComments(data.id);
@@ -222,17 +264,20 @@ function loadComments(id) {
     onValue(ref(db, 'comments/' + id), s => {
         list.innerHTML = '';
         if(!s.exists()) return list.innerHTML = '<p style="opacity:0.3; font-size:0.85rem; padding:10px;">Belum ada komentar</p>';
-        s.forEach(c => { const v = c.val(); list.innerHTML += `<div style="background:var(--glass); padding:10px; border-radius:10px; margin-bottom:8px; font-size:0.85rem"><b style="color:var(--primary)">${v.authorName}</b>: ${v.text}</div>`; });
+        s.forEach(c => { 
+            const v = c.val(); 
+            list.innerHTML += `<div style="background:var(--glass); padding:10px; border-radius:10px; margin-bottom:8px; font-size:0.85rem"><b style="color:var(--primary)">${v.authorName}</b>: ${v.text}</div>`; 
+        });
     });
 }
 
 document.getElementById('btn-send').onclick = () => {
     const text = document.getElementById('inp-comment').value.trim();
-    if(!text) return;
-    if(!currentUser) { showToast('Login diperlukan'); openModal('modal-login'); return; }
+    if(!text || !currentUser) return;
     push(ref(db, 'comments/' + activeId), { text, authorName: userProfile.name, timestamp: Date.now() }).then(() => { document.getElementById('inp-comment').value = ''; });
 };
 
+// --- DRAWING TOOLS ---
 const draw = (e) => {
     if(!drawing) return;
     const r = canvas.getBoundingClientRect();
@@ -272,22 +317,14 @@ canvas.ontouchend = () => drawing = false;
 
 document.getElementById('t-undo').onclick = undo;
 document.getElementById('t-redo').onclick = redo;
-
 document.getElementById('color-picker').oninput = (e) => { color = e.target.value; tool = 'pencil'; updateToolButtons(); };
 document.getElementById('t-pencil').onclick = () => { tool = 'pencil'; updateToolButtons(); };
 document.getElementById('t-eraser').onclick = () => { tool = 'eraser'; updateToolButtons(); };
 document.getElementById('t-bucket').onclick = () => { tool = 'bucket'; updateToolButtons(); };
 
 function updateToolButtons() {
-    document.querySelectorAll('.tool-btn').forEach(b => {
-        b.style.background = 'var(--glass-heavy)';
-        b.classList.remove('active');
-    });
-    const activeTool = document.getElementById('t-' + tool);
-    if(activeTool) {
-        activeTool.style.background = 'var(--primary)';
-        activeTool.classList.add('active');
-    }
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('t-' + tool).classList.add('active');
 }
 
 document.getElementById('btn-upload-img').onclick = () => document.getElementById('file-upload').click();
@@ -315,14 +352,28 @@ document.getElementById('file-upload').onchange = (e) => {
     reader.readAsDataURL(file);
 };
 
+// --- MODALS ---
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.getElementById('btn-close-login').onclick = () => closeModal('modal-login');
+document.getElementById('btn-close-profile').onclick = () => closeModal('modal-profile');
+
 document.getElementById('btn-new').onclick = () => { px.fill(null); history = []; redoStack = []; render(ctx, px); switchView('editor'); };
 document.getElementById('btn-save').onclick = () => { if(!currentUser) { showToast('Login diperlukan'); openModal('modal-login'); return; } openModal('modal-publish'); };
+
 document.getElementById('btn-publish').onclick = () => {
     const title = document.getElementById('inp-title').value.trim();
     if(!title) return showToast('Judul diperlukan');
     push(ref(db, 'artworks'), {
-        title, description: document.getElementById('inp-desc').value.trim(),
-        pixels: JSON.stringify(px), authorName: userProfile.name, authorPhoto: userProfile.photo, authorUid: currentUser.uid, timestamp: Date.now()
-    }).then(() => { showToast('Berhasil Publish'); closeModal('modal-publish'); switchView('home'); });
+        title, 
+        description: document.getElementById('inp-desc').value.trim(),
+        pixels: JSON.stringify(px), 
+        authorUid: currentUser.uid, 
+        timestamp: Date.now()
+    }).then(() => { 
+        showToast('Berhasil Publish'); 
+        closeModal('modal-publish'); 
+        switchView('home'); 
+    });
 };
 document.getElementById('btn-cancel-publish').onclick = () => closeModal('modal-publish');
