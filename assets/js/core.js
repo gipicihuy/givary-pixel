@@ -132,28 +132,6 @@ function switchView(view) {
 }
 window.backHome = () => switchView('home');
 
-// --- DOWNLOAD FEATURE ---
-document.getElementById('btn-download').onclick = () => {
-    const tempCanvas = document.createElement('canvas');
-    const tCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = 1024; // Upscale HD
-    tempCanvas.height = 1024;
-    tCtx.imageSmoothingEnabled = false;
-    
-    const activePixels = JSON.parse(currentActivePixels);
-    activePixels.forEach((p, i) => {
-        if(p) {
-            tCtx.fillStyle = p;
-            tCtx.fillRect((i%32)*32, Math.floor(i/32)*32, 32, 32);
-        }
-    });
-
-    const link = document.createElement('a');
-    link.download = `GivaryPixel_${Date.now()}.png`;
-    link.href = tempCanvas.toDataURL("image/png");
-    link.click();
-};
-
 // --- AUTH & PROFILE ---
 onAuthStateChanged(auth, u => {
     currentUser = u;
@@ -173,6 +151,22 @@ function updateUI() {
     document.getElementById('u-name').innerText = currentUser ? (userProfile.name || 'User') : 'Login';
     document.getElementById('u-avatar').src = currentUser ? (userProfile.photo || `https://ui-avatars.com/api/?name=Guest`) : 'https://ui-avatars.com/api/?name=Guest';
 }
+
+// FIX: Panggil Modal Profil (Fungsi Global)
+window.openProfileModal = () => {
+    const modal = document.getElementById('modal-profile');
+    if(modal) {
+        document.getElementById('profile-avatar').src = userProfile.photo;
+        document.getElementById('inp-profile-name').value = userProfile.name;
+        document.getElementById('inp-profile-bio').value = userProfile.bio;
+        modal.classList.add('open');
+    }
+};
+
+document.getElementById('btn-login').onclick = () => { 
+    if(currentUser) { window.openProfileModal(); } 
+    else { openModal('modal-login'); } 
+};
 
 // --- GALLERY ---
 onValue(ref(db, 'artworks'), snap => {
@@ -240,6 +234,7 @@ function openDetailView(data) {
     loadComments(data.id);
 }
 
+// FIX: Komentar dengan Foto Profil Real-time
 function loadComments(id) {
     const list = document.getElementById('comment-list');
     onValue(ref(db, 'comments/' + id), s => {
@@ -247,10 +242,12 @@ function loadComments(id) {
         if(!s.exists()) return list.innerHTML = '<p style="opacity:0.3; text-align:center;">Belum ada komentar</p>';
         s.forEach(c => { 
             const v = c.val(); 
+            const cDiv = document.createElement('div');
+            cDiv.style = "display:flex; gap:12px; background:var(--glass); padding:12px; border-radius:15px; align-items:flex-start;";
+            
+            // Nested listener untuk ambil foto user tiap komentar
             onValue(ref(db, 'users/' + v.authorUid), uSnap => {
                 const u = uSnap.val() || { photo: 'https://ui-avatars.com/api/?name=?', name: v.authorName };
-                const cDiv = document.createElement('div');
-                cDiv.style = "display:flex; gap:12px; background:var(--glass); padding:12px; border-radius:15px; align-items:flex-start;";
                 cDiv.innerHTML = `
                     <img src="${u.photo}" style="width:32px; height:32px; border-radius:50%;">
                     <div style="flex:1">
@@ -258,8 +255,8 @@ function loadComments(id) {
                         <p style="font-size:0.85rem; margin:3px 0 0 0; color:white;">${v.text}</p>
                     </div>
                 `;
-                list.appendChild(cDiv);
             }, { onlyOnce: true });
+            list.appendChild(cDiv);
         });
     });
 }
@@ -323,6 +320,21 @@ document.getElementById('t-eraser').onclick = () => { tool = 'eraser'; updateToo
 document.getElementById('t-bucket').onclick = () => { tool = 'bucket'; updateToolButtons(); };
 function updateToolButtons() { document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); document.getElementById('t-' + tool).classList.add('active'); }
 
+// --- DOWNLOAD ---
+document.getElementById('btn-download').onclick = () => {
+    const tempCanvas = document.createElement('canvas');
+    const tCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = 1024; tC.height = 1024;
+    tCtx.imageSmoothingEnabled = false;
+    JSON.parse(currentActivePixels).forEach((p, i) => {
+        if(p) { tCtx.fillStyle = p; tCtx.fillRect((i%32)*32, Math.floor(i/32)*32, 32, 32); }
+    });
+    const link = document.createElement('a');
+    link.download = `GivaryPixel_${Date.now()}.png`;
+    link.href = tempCanvas.toDataURL("image/png");
+    link.click();
+};
+
 // --- IMAGE CONVERT ---
 document.getElementById('btn-upload-img').onclick = () => document.getElementById('file-upload').click();
 document.getElementById('file-upload').onchange = (e) => {
@@ -348,12 +360,12 @@ document.getElementById('file-upload').onchange = (e) => {
     reader.readAsDataURL(file);
 };
 
-// --- MODALS & EVENTS ---
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+// --- MODALS ---
+window.openModal = (id) => { document.getElementById(id).classList.add('open'); };
+window.closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
+
 document.getElementById('btn-new').onclick = () => { px.fill(null); history = []; redoStack = []; render(ctx, px); switchView('editor'); };
 document.getElementById('btn-save').onclick = () => { if(!currentUser) { showToast('Login dulu!'); openModal('modal-login'); return; } openModal('modal-publish'); };
-document.getElementById('btn-login').onclick = () => { if(currentUser) { openProfileModal(); } else { openModal('modal-login'); } };
 document.getElementById('btn-google-login').onclick = () => { signInWithPopup(auth, provider).then(() => { closeModal('modal-login'); showToast('Login Berhasil'); }).catch(() => showToast('Login Gagal')); };
 
 document.getElementById('btn-publish').onclick = () => {
